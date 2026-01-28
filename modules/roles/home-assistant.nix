@@ -44,7 +44,7 @@
     '';
     shellAliases = {
       claude = "nix run github:sadjow/claude-code-nix";
-      nrs = "sudo nixos-rebuild switch --flake /etc/nixos#default --refresh";
+      nrs = "sudo nix flake update --flake /etc/nixos && sudo nixos-rebuild switch --flake /etc/nixos#default";
     };
   };
 
