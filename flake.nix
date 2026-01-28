@@ -100,6 +100,15 @@
         ];
       };
 
+      # Deployable host configurations
+      # Rebuild with: nixos-rebuild switch --flake .#nixos-ha-server --target-host hanix@<ip> --use-remote-sudo
+      nixosConfigurations.nixos-ha-server = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [
+          ./hosts/nixos-ha-server/configuration.nix
+        ];
+      };
+
       # Development shell for working on the ISO
       devShells.${system}.default = pkgs.mkShell {
         buildInputs = with pkgs; [
