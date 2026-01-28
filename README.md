@@ -1,293 +1,124 @@
-# NixOS Custom ISO
+# runmeNix
 
-A custom NixOS installation ISO with a TUI installer, inspired by [Tonarchy](https://github.com/tonybanters/tonarchy).
+A custom NixOS minimal ISO and deployable server configurations managed via flakes.
 
-## Philosophy
+## What This Is
 
-This project provides **opinionated installation modes** that take users from zero to hero:
-
-- **Beginner Mode**: Full XFCE desktop with sensible defaults - no choices, no confusion
-- **Minimal Mode**: Lightweight terminal-focused setup for experienced users
-- **Hyprland Mode**: Modern Wayland tiling compositor for those who want cutting-edge
-
-## Features
-
-- 🎯 **Opinionated Profiles**: Pre-configured desktop environments
-- 🖥️ **TUI Installer**: Interactive terminal installer with fzf integration
-- ⚡ **NixOS 25.11**: Latest stable NixOS release
-- 🔧 **UEFI + BIOS**: Support for both boot modes
-- 📦 **Flakes**: Modern Nix with flakes enabled by default
-- 🔑 **Tonarchy-Inspired Keybindings**: Consistent Super-key shortcuts across profiles
-- 🦊 **Pre-configured Firefox**: uBlock Origin and Dark Reader pre-installed
-- 🎨 **Dark Theme**: Adwaita-dark out of the box
+- A **minimal NixOS installer ISO** — terminal-only, no GUI, no profile menus
+- **Deployable host configurations** — edit locally, push to remote machines over SSH/Tailscale
+- **Flake-based** — reproducible builds, one repo for ISO + host configs
 
 ## Quick Start
-
-### Mac Users: Start Here! 🍎
-
-If you're on macOS, run the setup helper first:
-
-```bash
-cd nixos-custom-iso
-./setup-mac.sh
-```
-
-Then see **[TESTING-ON-MAC.md](TESTING-ON-MAC.md)** for detailed instructions on using UTM or QEMU.
 
 ### Build the ISO
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/nixos-custom-iso
-cd nixos-custom-iso
+git clone https://github.com/runmedaily/runmeNix
+cd runmeNix
 
-# Using Makefile (recommended)
-make build-beginner   # Build XFCE ISO
-make build-minimal    # Build minimal ISO
-make build-hyprland   # Build Hyprland ISO
-make build-all        # Build all ISOs
-
-# Or using nix directly
-nix build .#nixosConfigurations.iso-beginner.config.system.build.isoImage
-nix build .#nixosConfigurations.iso-minimal.config.system.build.isoImage
-nix build .#nixosConfigurations.iso-hyprland.config.system.build.isoImage
-
+make build-minimal
 # ISO will be in result/iso/
-ls result/iso/
-```
-
-### Test in QEMU
-
-```bash
-# Using Makefile (recommended)
-make test-beginner   # Test beginner ISO
-make test-minimal    # Test minimal ISO
-make test-hyprland   # Test Hyprland ISO
-
-# Or manually
-nix develop
-qemu-system-x86_64 -enable-kvm -m 4G -cdrom result/iso/*.iso
 ```
 
 ### Write to USB
 
 ```bash
-# Find your USB device
 lsblk
-
-# Write ISO (replace /dev/sdX with your USB device)
 sudo dd if=result/iso/*.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
-## Installation Modes
+### Install
 
-### Beginner (XFCE)
+Boot from USB. The installer runs automatically on tty1, or start it manually:
 
-Perfect for your first Linux installation:
+```bash
+sudo /etc/nixos-custom/install.sh
+```
 
-- XFCE desktop with Adwaita-dark theme
-- Auto-login enabled
-- Firefox with uBlock Origin and Dark Reader pre-installed
-- Alacritty terminal, Thunar file manager, VLC media player
-- Rofi app launcher with Super+D keybinding
-- Neovim for editing
-- NetworkManager for easy network configuration
-- Tonarchy-inspired keybindings (Super+Return, Super+E, Super+Q, etc.)
+The installer partitions the disk (UEFI or BIOS), sets up a user with ZSH + oh-my-zsh, SSH key auth, and installs a minimal terminal environment.
 
-### Minimal (Terminal)
+## Deploying to Hosts
 
-For experienced users who prefer the command line:
+After initial install, manage hosts remotely from your dev machine:
 
-- No GUI - pure TTY
-- ZSH with syntax highlighting and autosuggestions
-- Starship prompt
-- Modern CLI tools: eza, bat, ripgrep, fd, fzf
-- tmux/zellij for terminal multiplexing
-- Neovim as default editor
+```bash
+# Edit the host config
+vim hosts/nixos-ha-server/configuration.nix
 
-### Hyprland (Wayland)
+# Deploy to the machine
+NIX_SSHOPTS="-i ~/.ssh/nixos_custom_iso_ed25519" \
+  nixos-rebuild switch \
+  --flake .#nixos-ha-server \
+  --target-host hanix@<hostname> \
+  --sudo --ask-sudo-password
+```
 
-Modern tiling compositor with eye candy:
+Or rebuild from the machine itself:
 
-- Hyprland compositor
-- Waybar, Wofi, Dunst
-- Alacritty/Kitty terminals
-- Screenshot tools (grim, slurp)
-- Beautiful default configuration
+```bash
+sudo nixos-rebuild switch --flake github:runmedaily/runmeNix#nixos-ha-server --refresh
+```
+
+## What's Included
+
+The minimal install and host configs provide:
+
+- **ZSH** with oh-my-zsh (robbyrussell theme), autosuggestions, syntax highlighting
+- **neofetch** on shell start
+- **claude** alias (`nix run github:sadjow/claude-code-nix`)
+- **SSH** with ed25519 key auth, no password, no root login
+- **Tailscale** VPN
+- **Neovim** as default editor (with vi/vim aliases)
+- **Starship** prompt
+- **Terminal tools**: tmux, git, curl, wget, htop, btop, eza, bat, ripgrep, fd, fzf, ranger
 
 ## Project Structure
 
 ```
-nixos-custom-iso/
-├── flake.nix              # Main flake definition
-├── iso.nix                # ISO-specific configuration
-├── profiles/              # Live environment profiles
-│   ├── beginner.nix       # XFCE live environment
-│   ├── minimal.nix        # Minimal live environment
-│   └── hyprland.nix       # Hyprland live environment
-├── modules/               # Target system modules
-│   ├── common.nix         # Shared configuration
+runmeNix/
+├── flake.nix              # Flake outputs: ISOs + host configs
+├── iso.nix                # Live ISO environment
+├── hosts/                 # Deployable machine configurations
+│   └── nixos-ha-server/
+│       ├── configuration.nix
+│       └── hardware-configuration.nix
+├── profiles/
+│   └── minimal.nix        # Live ISO profile
+├── modules/
+│   ├── common.nix         # Shared base config
 │   └── desktop/
-│       ├── xfce.nix       # XFCE target config
-│       ├── minimal.nix    # Minimal target config
-│       └── hyprland.nix   # Hyprland target config
+│       └── minimal.nix    # Terminal-focused module
 └── installer/
     └── install.sh         # TUI installer script
 ```
 
-## Keybindings
+## Adding a New Host
 
-### XFCE (Beginner Mode)
-
-| Key | Action |
-|-----|--------|
-| `Super+Return` | Terminal (Alacritty) |
-| `Super+D` | App Launcher (Rofi) |
-| `Super+E` | File Manager (Thunar) |
-| `Super+Q` | Close Window |
-| `Super+F` | Fullscreen |
-| `Super+1-9` | Switch Workspace |
-
-### Hyprland Mode
-
-| Key | Action |
-|-----|--------|
-| `Super+Return` | Terminal (Alacritty) |
-| `Super+D` | App Launcher (Wofi) |
-| `Super+E` | File Manager (Thunar) |
-| `Super+Q` | Close Window |
-| `Super+F` | Fullscreen |
-| `Super+V` | Toggle Floating |
-| `Super+1-9` | Switch Workspace |
-| `Super+Shift+1-9` | Move to Workspace |
-| `Print` | Screenshot (region) |
-| `Shift+Print` | Screenshot (full) |
-
-## Customization
-
-### Adding Packages
-
-Edit the relevant profile in `profiles/` or module in `modules/desktop/`:
+1. Create `hosts/<name>/` with `configuration.nix` and `hardware-configuration.nix`
+2. Add to `flake.nix`:
 
 ```nix
-environment.systemPackages = with pkgs; [
-  # Add your packages here
-  spotify
-  discord
-  vscode
-];
-```
-
-### Changing Defaults
-
-Most settings use `lib.mkDefault` and can be overridden. Create a custom profile or modify existing ones.
-
-### Creating a New Profile
-
-1. Create a new file in `profiles/` (e.g., `profiles/gaming.nix`)
-2. Add it to `flake.nix`:
-
-```nix
-iso-gaming = mkIso {
-  profile = ./profiles/gaming.nix;
-  isoName = "nixos-gaming-${self.shortRev or "dev"}";
-  volumeID = "NIXOS_GAME";
+nixosConfigurations.<name> = nixpkgs.lib.nixosSystem {
+  inherit system;
+  modules = [ ./hosts/<name>/configuration.nix ];
 };
 ```
 
-## Disk Layout
+3. Deploy: `nixos-rebuild switch --flake .#<name> --target-host user@host --sudo --ask-sudo-password`
 
-### UEFI Systems
+## First-Time Bootstrap
 
-| Partition | Size | Type | Mount |
-|-----------|------|------|-------|
-| 1 | 1GB | FAT32 (ESP) | /boot |
-| 2 | 4GB (configurable) | swap | - |
-| 3 | Remaining | ext4 | / |
-
-### BIOS Systems
-
-| Partition | Size | Type | Mount |
-|-----------|------|------|-------|
-| 1 | 4GB (configurable) | swap | - |
-| 2 | Remaining | ext4 (bootable) | / |
-
-## Requirements
-
-- UEFI or BIOS system
-- 4GB+ RAM (8GB recommended for Hyprland)
-- 20GB+ disk space
-- Internet connection
-
-## Makefile Commands
-
-The project includes a Makefile for convenience:
+After a fresh install, the machine needs one manual rebuild to pick up `trusted-users` so remote deploys work:
 
 ```bash
-make help              # Show all available commands
-make build-beginner    # Build beginner (XFCE) ISO
-make build-minimal     # Build minimal ISO
-make build-hyprland    # Build Hyprland ISO
-make build-all         # Build all ISOs
-make test-beginner     # Test beginner ISO in QEMU
-make test-minimal      # Test minimal ISO in QEMU
-make test-hyprland     # Test Hyprland ISO in QEMU
-make clean             # Remove build artifacts
-make dev               # Enter development shell
-make update            # Update flake inputs
-make check             # Check flake validity
+# SSH into the machine
+ssh -i ~/.ssh/nixos_custom_iso_ed25519 user@<ip>
+
+# Bootstrap from the flake
+sudo nixos-rebuild switch --flake github:runmedaily/runmeNix#nixos-ha-server --refresh
 ```
 
-## Roadmap
-
-- [x] XFCE Beginner Mode
-- [x] Minimal Mode
-- [x] Hyprland Mode
-- [x] UEFI support
-- [x] BIOS support
-- [x] Tonarchy-inspired keybindings
-- [x] Firefox with pre-installed extensions
-- [x] Makefile for build convenience
-- [ ] Encrypted disk support (LUKS)
-- [ ] Btrfs with snapshots
-- [ ] Multi-disk configurations
-- [ ] COSMIC Desktop mode
-- [ ] Home-manager integration
-- [ ] GitHub Actions CI/CD
-
-## Credits
-
-This project is heavily inspired by [Tonarchy](https://github.com/tonybanters/tonarchy) by @tonybanters, 
-an excellent zero-dependency Arch Linux installer with a clean TUI. We've adapted its opinionated 
-philosophy and user-friendly approach to NixOS.
-
-Key inspirations from Tonarchy:
-- Opinionated installation modes (Beginner, Minimal, Advanced)
-- Keyboard shortcuts scheme (Super key bindings)
-- TUI installer design with fzf integration
-- Pre-configured Firefox with privacy extensions
-- Zero-to-hero philosophy with sensible defaults
-
-Built on [NixOS](https://nixos.org/) - the purely functional Linux distribution.
-
-## Differences from Tonarchy
-
-While inspired by Tonarchy, this project has some key differences:
-
-| Feature | Tonarchy (Arch) | NixOS Custom ISO |
-|---------|-----------------|------------------|
-| **Base Distribution** | Arch Linux | NixOS |
-| **Installer Language** | C (~1500 lines) | Bash + Nix |
-| **Configuration** | Imperative | Declarative (Nix) |
-| **Beginner Desktop** | XFCE (getty autologin) | XFCE (LightDM) |
-| **Minimal Mode** | OXWM (Rust WM) | Terminal-only |
-| **Advanced Mode** | Wayland (Niri) | Hyprland |
-| **Package Management** | pacman | Nix/Flakes |
-| **Reproducibility** | Manual | Built-in (Nix) |
-| **Rollbacks** | Manual/snapshots | Built-in (generations) |
-
-Both projects share the same philosophy: make Linux accessible with opinionated, 
-well-configured defaults while teaching best practices.
+After this, all future deploys can be done remotely via `--target-host`.
 
 ## License
 
