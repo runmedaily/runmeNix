@@ -33,6 +33,17 @@
     ];
   };
 
+  # Create .zshrc to prevent zsh-newuser-install wizard
+  system.activationScripts.zshrc = ''
+    for dir in /home/*; do
+      user=$(basename "$dir")
+      if [ -d "$dir" ] && ! [ -f "$dir/.zshrc" ]; then
+        echo "# Managed by NixOS - system zsh config is in /etc/zshrc" > "$dir/.zshrc"
+        chown "$user:users" "$dir/.zshrc"
+      fi
+    done
+  '';
+
   # No GUI - terminal only
   services.xserver.enable = false;
 
@@ -79,6 +90,8 @@
   environment.systemPackages = with pkgs; [
     tmux git curl wget htop btop neofetch
     eza bat ripgrep fd fzf ranger starship
+    cowsay
+    kitty.terminfo
   ];
 
   # Nix settings
