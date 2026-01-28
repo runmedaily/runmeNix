@@ -15,8 +15,6 @@
       PasswordAuthentication = lib.mkDefault false;
     };
   };
-  networking.firewall.allowedTCPPorts = [ 22 ];
-
   # DNS - systemd-resolved handles split DNS so Tailscale and public DNS coexist
   services.resolved = {
     enable = lib.mkDefault true;
@@ -77,6 +75,26 @@
     experimental-features = [ "nix-command" "flakes" ];
     trusted-users = [ "root" "@wheel" ];
   };
+
+  # Docker
+  virtualisation.docker.enable = lib.mkDefault true;
+
+  # Home Assistant Core container
+  virtualisation.oci-containers = {
+    backend = "docker";
+    containers.homeassistant = {
+      image = "ghcr.io/home-assistant/home-assistant:stable";
+      volumes = [ "/srv/homeassistant:/config" ];
+      environment = {
+        TZ = config.time.timeZone;
+      };
+      extraOptions = [ "--network=host" "--privileged" ];
+      autoStart = true;
+    };
+  };
+
+  # Open Home Assistant web UI port
+  networking.firewall.allowedTCPPorts = [ 22 8123 ];
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = lib.mkDefault true;
