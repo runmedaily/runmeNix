@@ -91,10 +91,20 @@
       extraOptions = [ "--network=host" "--privileged" ];
       autoStart = true;
     };
+
+    containers.nodered = {
+      image = "nodered/node-red:latest";
+      volumes = [ "/srv/nodered:/data" ];
+      environment = {
+        TZ = config.time.timeZone;
+      };
+      extraOptions = [ "--network=host" ];
+      autoStart = true;
+    };
   };
 
-  # Open Home Assistant web UI port
-  networking.firewall.allowedTCPPorts = [ 22 8123 ];
+  # Open service ports: SSH, Home Assistant, Node-RED
+  networking.firewall.allowedTCPPorts = [ 22 8123 1880 ];
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = lib.mkDefault true;
