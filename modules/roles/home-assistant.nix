@@ -79,6 +79,12 @@
   # Docker
   virtualisation.docker.enable = lib.mkDefault true;
 
+  # Ensure container data directories exist with correct ownership
+  systemd.tmpfiles.rules = [
+    "d /srv/homeassistant 0755 root root -"
+    "d /srv/nodered 0755 1000 1000 -"
+  ];
+
   # Home Assistant Core container
   virtualisation.oci-containers = {
     backend = "docker";
