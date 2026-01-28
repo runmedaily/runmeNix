@@ -411,6 +411,11 @@ generate_minimal_config() {
   # Shell enhancements
   programs.zsh.autosuggestions.enable = true;
   programs.zsh.syntaxHighlighting.enable = true;
+  programs.zsh.ohMyZsh = {
+    enable = true;
+    plugins = [ "git" "sudo" "systemd" ];
+    theme = "robbyrussell";
+  };
   programs.zsh.interactiveShellInit = ''
     neofetch
   '';
