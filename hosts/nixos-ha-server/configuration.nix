@@ -75,6 +75,11 @@
   };
   networking.firewall.allowedTCPPorts = [ 22 ];
 
+  # Tailscale
+  services.tailscale.enable = true;
+  networking.firewall.trustedInterfaces = [ "tailscale0" ];
+  networking.firewall.allowedUDPPorts = [ config.services.tailscale.port ];
+
   # Neovim
   programs.neovim = {
     enable = true;
