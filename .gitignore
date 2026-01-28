@@ -1,0 +1,31 @@
+# Nix build artifacts
+result
+result-*
+
+# Flake lock (optional - you may want to track this)
+# flake.lock
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# ISO files (don't commit built ISOs)
+*.iso
+
+# Temporary files
+tmp/
+.tmp/
+
+# QEMU test files
+test-disk.qcow2
+*.qcow2
+
+# Build logs
+build.log
