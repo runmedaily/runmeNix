@@ -12,7 +12,8 @@
   # Kernel
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
-  # Networking — hostname is set per-machine during install, not overridden here
+  # Networking
+  networking.hostName = "zion";
   networking.networkmanager.enable = true;
 
   # Time and Locale
@@ -62,7 +63,7 @@
     '';
     shellAliases = {
       claude = "nix run github:sadjow/claude-code-nix";
-      nrs = "sudo nixos-rebuild switch --flake github:runmedaily/runmeNix#nixos-ha-server --refresh";
+      nrs = "sudo nixos-rebuild switch --flake github:runmedaily/runmeNix#zion --refresh";
     };
   };
 

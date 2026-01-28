@@ -105,16 +105,15 @@
       };
 
       # Deployable host configurations
-      # Rebuild with: nixos-rebuild switch --flake .#nixos-ha-server --target-host hanix@<ip> --use-remote-sudo
-      nixosConfigurations.nixos-ha-server = nixpkgs.lib.nixosSystem {
+      nixosConfigurations.zion = nixpkgs.lib.nixosSystem {
         inherit system;
         modules = [
-          ./hosts/nixos-ha-server/configuration.nix
+          ./hosts/zion/configuration.nix
           home-manager.nixosModules.home-manager
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
-            home-manager.users.hanix = import ./hosts/nixos-ha-server/home.nix;
+            home-manager.users.hanix = import ./hosts/zion/home.nix;
             home-manager.backupFileExtension = "backup";
           }
         ];
