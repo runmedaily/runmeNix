@@ -1,0 +1,7 @@
+-- Load order is managed by default.nix (extraLuaConfig concatenation).
+-- This file is kept as a reference for the intended load order:
+--   1. options.lua
+--   2. keymaps.lua
+--   3. appearance.lua
+--   4. telescope.lua
+--   5. oil-config.lua

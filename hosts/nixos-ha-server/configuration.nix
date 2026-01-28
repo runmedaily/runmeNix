@@ -62,6 +62,7 @@
     '';
     shellAliases = {
       claude = "nix run github:sadjow/claude-code-nix";
+      nrs = "sudo nixos-rebuild switch --flake github:runmedaily/runmeNix#nixos-ha-server --refresh";
     };
   };
 
@@ -75,18 +76,18 @@
   };
   networking.firewall.allowedTCPPorts = [ 22 ];
 
+  # DNS - systemd-resolved handles split DNS so Tailscale and public DNS coexist
+  services.resolved = {
+    enable = true;
+    fallbackDns = [ "1.1.1.1" "8.8.8.8" ];
+  };
+
   # Tailscale
   services.tailscale.enable = true;
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
   networking.firewall.allowedUDPPorts = [ config.services.tailscale.port ];
 
-  # Neovim
-  programs.neovim = {
-    enable = true;
-    defaultEditor = true;
-    viAlias = true;
-    vimAlias = true;
-  };
+  # Neovim — managed by home-manager (see home.nix + shared neovim module)
 
   # Starship prompt
   programs.starship.enable = true;
