@@ -435,9 +435,16 @@ run_installation() {
     log_info "This may take a while depending on your internet connection..."
     echo ""
 
-    # Run nixos-install with flake
-    nixos-install --flake "$MOUNT_POINT$CONFIG_DIR#default" --no-root-passwd
+    # Copy flake config outside /mnt to avoid Nix assertion bug
+    # (flake path under --store mount causes NAR hash mismatch)
+    local tmp_flake="/tmp/nixos-flake-config"
+    rm -rf "$tmp_flake"
+    cp -r "$MOUNT_POINT$CONFIG_DIR" "$tmp_flake"
 
+    # Run nixos-install with flake from temp location
+    nixos-install --flake "$tmp_flake#default" --no-root-passwd
+
+    rm -rf "$tmp_flake"
     log_success "Installation complete!"
 }
 
