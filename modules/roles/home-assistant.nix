@@ -106,7 +106,35 @@
       };
       extraOptions = [ "--network=host" ];
       autoStart = true;
+      dependsOn = [ "homeassistant" ];
     };
+  };
+
+  # Seed Node-RED package.json with HA module before container starts
+  systemd.services.nodered-seed-packages = {
+    description = "Seed Node-RED package.json with Home Assistant module";
+    wantedBy = [ "docker-nodered.service" ];
+    before = [ "docker-nodered.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      PKGJSON="/srv/nodered/package.json"
+      if [ ! -f "$PKGJSON" ]; then
+        cat > "$PKGJSON" << 'SEED'
+      {
+        "name": "nodered-project",
+        "description": "Node-RED with Home Assistant",
+        "version": "0.0.1",
+        "dependencies": {
+          "node-red-contrib-home-assistant-websocket": "*"
+        }
+      }
+      SEED
+        chown 1000:1000 "$PKGJSON"
+      fi
+    '';
   };
 
   # Open service ports: SSH, Home Assistant, Node-RED
