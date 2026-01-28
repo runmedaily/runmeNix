@@ -104,19 +104,14 @@
         ];
       };
 
-      # Deployable host configurations
-      nixosConfigurations.zion = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = [
-          ./hosts/zion/configuration.nix
-          home-manager.nixosModules.home-manager
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.users.hanix = import ./hosts/zion/home.nix;
-            home-manager.backupFileExtension = "backup";
-          }
-        ];
+      # Role modules — imported by server local flakes
+      nixosModules = {
+        home-assistant = import ./modules/roles/home-assistant.nix;
+      };
+
+      # Home-manager modules — shared user config (neovim, etc.)
+      homeManagerModules = {
+        server = import ./modules/shared/server-home.nix;
       };
 
       # Development shell for working on the ISO

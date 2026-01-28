@@ -1,7 +1,6 @@
 { config, ... }:
 {
-  imports = [ ../../modules/shared/neovim ];
-
+  imports = [ ./neovim ];
   home.homeDirectory = "/home/${config.home.username}";
   home.stateVersion = "25.11";
 }
