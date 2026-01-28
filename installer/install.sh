@@ -435,14 +435,18 @@ run_installation() {
     log_info "This may take a while depending on your internet connection..."
     echo ""
 
-    # Copy flake config outside /mnt to avoid Nix assertion bug
-    # (flake path under --store mount causes NAR hash mismatch)
+    # Build system closure first to avoid nixos-install --flake assertion bug
+    # (nixos-install passes --store /mnt which breaks flake NAR hash checks)
     local tmp_flake="/tmp/nixos-flake-config"
     rm -rf "$tmp_flake"
     cp -r "$MOUNT_POINT$CONFIG_DIR" "$tmp_flake"
 
-    # Run nixos-install with flake from temp location
-    nixos-install --flake "$tmp_flake#default" --no-root-passwd
+    log_info "Building system configuration..."
+    local system_path
+    system_path=$(nix build "path:$tmp_flake#nixosConfigurations.default.config.system.build.toplevel" --no-link --print-out-paths)
+
+    log_info "Installing system to disk..."
+    nixos-install --system "$system_path" --no-root-passwd
 
     rm -rf "$tmp_flake"
     log_success "Installation complete!"
