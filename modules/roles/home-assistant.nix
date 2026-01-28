@@ -97,8 +97,11 @@
       volumes = [ "/srv/nodered:/data" ];
       environment = {
         TZ = config.time.timeZone;
+        NODE_RED_ENABLE_SAFE_MODE = "false";
       };
       extraOptions = [ "--network=host" ];
+      entrypoint = "node-red";
+      cmd = [ "--userDir" "/data" "--host" "0.0.0.0" ];
       autoStart = true;
     };
   };
