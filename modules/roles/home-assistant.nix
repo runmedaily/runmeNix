@@ -21,6 +21,17 @@
     fallbackDns = [ "1.1.1.1" "8.8.8.8" ];
   };
 
+  # Avahi - mDNS/Bonjour for HomeKit and Homebridge device discovery
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    publish = {
+      enable = true;
+      addresses = true;
+      workstation = true;
+    };
+  };
+
   # Tailscale
   services.tailscale.enable = lib.mkDefault true;
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
