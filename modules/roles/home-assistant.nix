@@ -24,7 +24,6 @@
   # Tailscale
   services.tailscale.enable = lib.mkDefault true;
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
-  networking.firewall.allowedUDPPorts = [ config.services.tailscale.port ];
 
   # No GUI - terminal only
   services.xserver.enable = lib.mkDefault false;
@@ -137,8 +136,10 @@
     '';
   };
 
-  # Open service ports: SSH, Home Assistant, Node-RED
-  networking.firewall.allowedTCPPorts = [ 22 8123 1880 ];
+  # Open service ports: SSH, Home Assistant, Node-RED, HomeKit Bridge
+  networking.firewall.allowedTCPPorts = [ 22 8123 1880 21064 ];
+  # mDNS/Bonjour for HomeKit discovery
+  networking.firewall.allowedUDPPorts = [ 5353 config.services.tailscale.port ];
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = lib.mkDefault true;
