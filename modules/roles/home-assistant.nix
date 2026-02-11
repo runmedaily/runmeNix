@@ -148,8 +148,10 @@
     '';
   };
 
-  # Open service ports: SSH, Home Assistant, Node-RED, HomeKit Bridge, Homebridge UI + bridge
-  networking.firewall.allowedTCPPorts = [ 22 8123 1880 21064 8581 51826 ];
+  # Open service ports: SSH, Home Assistant, Node-RED, HomeKit Bridge, Homebridge UI
+  networking.firewall.allowedTCPPorts = [ 22 8123 1880 21064 8581 ];
+  # Homebridge main + child bridges use dynamic ports in this range
+  networking.firewall.allowedTCPPortRanges = [{ from = 35000; to = 58000; }];
   # mDNS/Bonjour for HomeKit discovery
   networking.firewall.allowedUDPPorts = [ 5353 config.services.tailscale.port ];
 
