@@ -82,6 +82,7 @@
   systemd.tmpfiles.rules = [
     "d /srv/homeassistant 0755 root root -"
     "d /srv/nodered 0755 1000 1000 -"
+    "d /srv/homebridge 0755 root root -"
   ];
 
   # Home Assistant Core container
@@ -106,6 +107,17 @@
       extraOptions = [ "--network=host" ];
       autoStart = true;
       dependsOn = [ "homeassistant" ];
+    };
+
+    containers.homebridge = {
+      image = "homebridge/homebridge:latest";
+      volumes = [ "/srv/homebridge:/homebridge" ];
+      environment = {
+        TZ = config.time.timeZone;
+        HOMEBRIDGE_CONFIG_UI_PORT = "8581";
+      };
+      extraOptions = [ "--network=host" ];
+      autoStart = true;
     };
   };
 
@@ -136,8 +148,8 @@
     '';
   };
 
-  # Open service ports: SSH, Home Assistant, Node-RED, HomeKit Bridge
-  networking.firewall.allowedTCPPorts = [ 22 8123 1880 21064 ];
+  # Open service ports: SSH, Home Assistant, Node-RED, HomeKit Bridge, Homebridge UI + bridge
+  networking.firewall.allowedTCPPorts = [ 22 8123 1880 21064 8581 51826 ];
   # mDNS/Bonjour for HomeKit discovery
   networking.firewall.allowedUDPPorts = [ 5353 config.services.tailscale.port ];
 
