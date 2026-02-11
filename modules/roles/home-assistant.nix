@@ -159,6 +159,24 @@
     '';
   };
 
+  # Ensure Homebridge uses ciao mDNS advertiser (reliable in Docker)
+  systemd.services.homebridge-fix-advertiser = {
+    description = "Patch Homebridge config to use ciao mDNS advertiser";
+    wantedBy = [ "docker-homebridge.service" ];
+    before = [ "docker-homebridge.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    path = [ pkgs.gnused ];
+    script = ''
+      CFG="/srv/homebridge/config.json"
+      if [ -f "$CFG" ]; then
+        sed -i 's/"advertiser": "bonjour-hap"/"advertiser": "ciao"/' "$CFG"
+      fi
+    '';
+  };
+
   # Open service ports: SSH, Home Assistant, Node-RED, HomeKit Bridge, Homebridge UI
   networking.firewall.allowedTCPPorts = [ 22 8123 1880 21064 8581 ];
   # Homebridge main + child bridges use dynamic ports in this range
