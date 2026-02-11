@@ -77,6 +77,25 @@ check_uefi() {
     fi
 }
 
+wait_for_internet() {
+    local attempt=0
+    local spin=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+
+    while ! curl -sf --max-time 5 https://cache.nixos.org >/dev/null 2>&1; do
+        local s=${spin[attempt % ${#spin[@]}]}
+        printf "\r${YELLOW}%s${NC} Waiting for internet... any day now" "$s"
+        sleep 2
+        attempt=$((attempt + 1))
+
+        if (( attempt % 15 == 0 )); then
+            echo ""
+            log_warn "Still no connection after $((attempt * 2))s. Check your network."
+        fi
+    done
+    printf "\r"
+    log_success "Internet connection available"
+}
+
 # ============================================================================
 # UI Functions
 # ============================================================================
@@ -431,24 +450,35 @@ LOCALEOF
 # ============================================================================
 
 run_installation() {
+    wait_for_internet
+
     log_info "Starting NixOS installation..."
     log_info "This may take a while depending on your internet connection..."
     echo ""
 
     # Build system closure first to avoid nixos-install --flake assertion bug
     # (nixos-install passes --store /mnt which breaks flake NAR hash checks)
-    local tmp_flake="/tmp/nixos-flake-config"
+    # Use disk-backed storage instead of /tmp (tmpfs) to avoid OOM on the tarball download
+    local tmp_flake="$MOUNT_POINT/tmp/nixos-flake-config"
     rm -rf "$tmp_flake"
+    mkdir -p "$MOUNT_POINT/tmp"
     cp -r "$MOUNT_POINT$CONFIG_DIR" "$tmp_flake"
+
+    # Point Nix temp files at disk too so large downloads don't exhaust RAM
+    export TMPDIR="$MOUNT_POINT/tmp"
+
+    log_info "Resolving flake inputs..."
+    nix flake lock "path:$tmp_flake"
 
     log_info "Building system configuration..."
     local system_path
-    system_path=$(nix build "path:$tmp_flake#nixosConfigurations.default.config.system.build.toplevel" --no-link --print-out-paths)
+    system_path=$(nix build --store "$MOUNT_POINT" "path:$tmp_flake#nixosConfigurations.default.config.system.build.toplevel" --no-link --print-out-paths)
 
     log_info "Installing system to disk..."
     nixos-install --system "$system_path" --no-root-passwd
 
-    rm -rf "$tmp_flake"
+    rm -rf "$tmp_flake" "$MOUNT_POINT/tmp"
+    unset TMPDIR
     log_success "Installation complete!"
 }
 

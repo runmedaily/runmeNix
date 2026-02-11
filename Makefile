@@ -102,7 +102,7 @@ test-minimal: test-disk.qcow2
 	@echo "Testing minimal ISO in QEMU..."
 	qemu-system-x86_64 \
 		$(QEMU_ACCEL) \
-		-m 2G \
+		-m 8G \
 		-smp 2 \
 		$(QEMU_CPU) \
 		-boot once=d \
