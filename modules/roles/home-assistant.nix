@@ -32,9 +32,9 @@
     };
   };
 
-  # Tailscale
-  services.tailscale.enable = lib.mkDefault true;
-  networking.firewall.trustedInterfaces = [ "tailscale0" ];
+  # Tailscale runs as a Docker container (allows plugging in a second tailnet)
+  services.tailscale.enable = lib.mkForce false;
+  boot.kernelModules = [ "tun" ];
 
   # No GUI - terminal only
   services.xserver.enable = lib.mkDefault false;
@@ -94,6 +94,7 @@
     "d /srv/homeassistant 0755 root root -"
     "d /srv/nodered 0755 1000 1000 -"
     "d /srv/homebridge 0755 root root -"
+    "d /srv/tailscale 0700 root root -"
   ];
 
   # Home Assistant Core container
@@ -128,6 +129,25 @@
         HOMEBRIDGE_CONFIG_UI_PORT = "8581";
       };
       extraOptions = [ "--network=host" ];
+      autoStart = true;
+    };
+
+    containers.tailscale = {
+      image = "tailscale/tailscale:latest";
+      volumes = [
+        "/srv/tailscale:/var/lib/tailscale"
+        "/dev/net/tun:/dev/net/tun"
+      ];
+      environment = {
+        TS_STATE_DIR = "/var/lib/tailscale";
+        TS_EXTRA_ARGS = "--advertise-exit-node";
+        TS_ACCEPT_DNS = "true";
+      };
+      extraOptions = [
+        "--cap-add=NET_ADMIN"
+        "--cap-add=NET_RAW"
+        "--network=host"
+      ];
       autoStart = true;
     };
   };
@@ -219,7 +239,7 @@
   # Homebridge main + child bridges use dynamic ports in this range
   networking.firewall.allowedTCPPortRanges = [{ from = 35000; to = 58000; }];
   # mDNS/Bonjour for HomeKit discovery
-  networking.firewall.allowedUDPPorts = [ 5353 config.services.tailscale.port ];
+  networking.firewall.allowedUDPPorts = [ 5353 41641 ];
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = lib.mkDefault true;
