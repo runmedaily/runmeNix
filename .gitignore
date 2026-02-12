@@ -29,3 +29,6 @@ test-disk.qcow2
 
 # Build logs
 build.log
+
+# Secrets
+.env

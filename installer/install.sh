@@ -20,6 +20,12 @@ MOUNT_POINT="/mnt"
 CONFIG_DIR="/etc/nixos"
 CUSTOM_DIR="/etc/nixos-custom"
 
+# Load secrets from .env (baked into ISO at /etc/nixos-custom/.env)
+ENV_FILE="/etc/nixos-custom/.env"
+if [[ -f "$ENV_FILE" ]]; then
+    source "$ENV_FILE"
+fi
+
 # Installation profile (set during selection)
 PROFILE=""
 DISK=""
@@ -236,9 +242,32 @@ select_role() {
 # Partitioning Functions
 # ============================================================================
 
+release_disk() {
+    log_info "Releasing existing partitions on $DISK..."
+
+    # Swapoff any swap partitions on the target disk
+    swapoff "${DISK}"* 2>/dev/null || true
+
+    # Unmount any mounted partitions on the target disk
+    for part in $(lsblk -nrpo NAME "$DISK" | tail -n +2); do
+        umount -f "$part" 2>/dev/null || true
+    done
+
+    # Close any LUKS/LVM mappings
+    for part in $(lsblk -nrpo NAME "$DISK" | tail -n +2); do
+        dmsetup remove "$part" 2>/dev/null || true
+    done
+
+    sleep 1
+    log_success "Disk released"
+}
+
 partition_disk_uefi() {
     log_info "Partitioning disk (UEFI mode)..."
-    
+
+    # Release any in-use partitions before wiping
+    release_disk
+
     # Wipe existing partition table
     wipefs -af "$DISK"
     
@@ -280,6 +309,9 @@ partition_disk_uefi() {
 
 partition_disk_bios() {
     log_info "Partitioning disk (BIOS mode)..."
+
+    # Release any in-use partitions before wiping
+    release_disk
 
     # Wipe existing partition table
     wipefs -af "$DISK"
@@ -434,7 +466,7 @@ LOCALEOF
     extraGroups = [ "wheel" "networkmanager" "video" "audio" ];
     shell = pkgs.zsh;
     openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEwWB/kUbJoBLlUWEtGjLhUwl0PnMO06Uq9MufQxnNrn nixos-custom-iso"
+$(for key in "${SSH_AUTHORIZED_KEYS[@]}"; do echo "      \"$key\""; done)
     ];
   };
 
@@ -485,7 +517,11 @@ run_installation() {
 set_user_password() {
     log_info "Setting password for user '$USERNAME'..."
     echo ""
-    nixos-enter --root "$MOUNT_POINT" -c "passwd $USERNAME"
+    while ! nixos-enter --root "$MOUNT_POINT" -c "passwd $USERNAME"; do
+        log_warn "Password setup failed. Let's try that again..."
+        echo ""
+    done
+    log_success "Password set for '$USERNAME'"
 }
 
 # ============================================================================
@@ -557,7 +593,15 @@ main() {
     
     # Set user password
     set_user_password
-    
+
+    # Join Tailscale if auth key is available
+    if [[ -n "${TAILSCALE_AUTHKEY:-}" ]]; then
+        log_info "Joining Tailscale network..."
+        nixos-enter --root "$MOUNT_POINT" -c "tailscale up --authkey=$TAILSCALE_AUTHKEY" 2>/dev/null && \
+            log_success "Tailscale joined" || \
+            log_warn "Tailscale join failed - you can run 'sudo tailscale up' after reboot"
+    fi
+
     # Done!
     show_banner
     echo -e "${GREEN}${BOLD}"
@@ -573,9 +617,31 @@ main() {
     echo ""
     
     if confirm "Reboot now?"; then
+        log_info "Preparing to reboot into new system..."
+
+        # Unmount the installed system
         umount -R "$MOUNT_POINT" 2>/dev/null || true
         swapoff -a 2>/dev/null || true
+
+        # Eject the USB/ISO installation media
+        local boot_dev
+        boot_dev=$(findmnt -n -o SOURCE /iso 2>/dev/null || findmnt -n -o SOURCE /run/live/medium 2>/dev/null || true)
+        if [[ -n "$boot_dev" ]]; then
+            # Get the parent disk of the boot partition
+            boot_dev=$(lsblk -nrpo PKNAME "$boot_dev" 2>/dev/null | head -1)
+        fi
+        umount /iso 2>/dev/null || true
+        umount /run/live/medium 2>/dev/null || true
+        if [[ -n "$boot_dev" ]]; then
+            eject "$boot_dev" 2>/dev/null || true
+        fi
         eject /dev/sr0 2>/dev/null || eject /dev/cdrom 2>/dev/null || true
+
+        # Set boot order to installed disk
+        if check_uefi; then
+            efibootmgr -n 0000 2>/dev/null || true
+        fi
+
         reboot
     fi
 }

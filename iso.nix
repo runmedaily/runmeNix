@@ -91,6 +91,12 @@
       mode = "0755";
     };
 
+    # Secrets (from .env, gitignored)
+    "nixos-custom/.env" = lib.mkIf (builtins.pathExists ./.env) {
+      source = ./.env;
+      mode = "0600";
+    };
+
     # Helper script to launch installer
     "nixos-custom/README.txt".text = ''
       ╔══════════════════════════════════════════════════════════════╗
