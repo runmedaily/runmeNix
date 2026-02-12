@@ -107,6 +107,7 @@
       # Role modules — imported by server local flakes
       nixosModules = {
         home-assistant = import ./modules/roles/home-assistant.nix;
+        dual-tailscale = import ./modules/roles/dual-tailscale.nix;
       };
 
       # Home-manager modules — shared user config (neovim, etc.)
