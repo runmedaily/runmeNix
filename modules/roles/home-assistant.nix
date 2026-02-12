@@ -159,6 +159,43 @@
     '';
   };
 
+  # Seed HACS and Node-RED Companion into Home Assistant before container starts
+  systemd.services.homeassistant-seed-hacs = {
+    description = "Install HACS and Node-RED Companion into Home Assistant";
+    wantedBy = [ "docker-homeassistant.service" ];
+    before = [ "docker-homeassistant.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    path = [ pkgs.curl pkgs.unzip pkgs.coreutils ];
+    script = ''
+      HA_CONFIG="/srv/homeassistant"
+      CUSTOM="$HA_CONFIG/custom_components"
+      mkdir -p "$CUSTOM"
+
+      # Install HACS
+      if [ ! -d "$CUSTOM/hacs" ]; then
+        echo "Installing HACS..."
+        TMPDIR=$(mktemp -d)
+        curl -fsSL -o "$TMPDIR/hacs.zip" "https://github.com/hacs/integration/releases/latest/download/hacs.zip"
+        unzip -o "$TMPDIR/hacs.zip" -d "$CUSTOM/hacs"
+        rm -rf "$TMPDIR"
+        echo "HACS installed"
+      fi
+
+      # Install Node-RED Companion
+      if [ ! -d "$CUSTOM/nodered" ]; then
+        echo "Installing Node-RED Companion..."
+        TMPDIR=$(mktemp -d)
+        curl -fsSL -o "$TMPDIR/nodered.zip" "https://github.com/zachowj/hass-node-red/releases/latest/download/nodered.zip"
+        unzip -o "$TMPDIR/nodered.zip" -d "$CUSTOM/nodered"
+        rm -rf "$TMPDIR"
+        echo "Node-RED Companion installed"
+      fi
+    '';
+  };
+
   # Ensure Homebridge uses ciao mDNS advertiser (reliable in Docker)
   systemd.services.homebridge-fix-advertiser = {
     description = "Patch Homebridge config to use ciao mDNS advertiser";
