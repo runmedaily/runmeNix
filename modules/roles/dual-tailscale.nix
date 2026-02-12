@@ -21,11 +21,11 @@
         TS_STATE_DIR = "/var/lib/tailscale";
         TS_EXTRA_ARGS = "--advertise-exit-node";
         TS_ACCEPT_DNS = "true";
+        TS_HOSTNAME = config.networking.hostName;
       };
       extraOptions = [
         "--cap-add=NET_ADMIN"
         "--cap-add=NET_RAW"
-        "--hostname=tailscale-secondary"
       ];
       autoStart = true;
     };
