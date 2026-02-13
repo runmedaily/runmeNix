@@ -1,124 +1,142 @@
 # runmeNix
 
-A custom NixOS minimal ISO and deployable server configurations managed via flakes.
+A flake-based NixOS platform for home automation servers and custom installer ISOs.
 
-## What This Is
+## Overview
 
-- A **minimal NixOS installer ISO** — terminal-only, no GUI, no profile menus
-- **Deployable host configurations** — edit locally, push to remote machines over SSH/Tailscale
-- **Flake-based** — reproducible builds, one repo for ISO + host configs
+- **Role modules** consumed by servers via local flakes (home-assistant, dual-tailscale)
+- **Custom installer ISO** with TUI — partitions disk, sets up user, deploys a role
+- **Docker-first services** — Home Assistant, Node-RED, Homebridge, Tailscale all run as containers
+- **Multi-tailnet support** — primary + secondary Tailscale for joining separate networks
 
-## Quick Start
+## Architecture
 
-### Build the ISO
+Servers don't live in this repo. Each server keeps a local flake at `/etc/nixos/` that pulls role modules from GitHub:
+
+```nix
+# /etc/nixos/flake.nix on the server
+{
+  inputs.runmeNix.url = "github:runmedaily/runmeNix";
+
+  outputs = { nixpkgs, runmeNix, ... }: {
+    nixosConfigurations.default = nixpkgs.lib.nixosSystem {
+      modules = [
+        ./hardware-configuration.nix
+        ./local.nix
+        runmeNix.nixosModules.home-assistant
+        runmeNix.nixosModules.dual-tailscale  # optional
+      ];
+    };
+  };
+}
+```
+
+Rebuild from the server:
+
+```bash
+nrs  # alias: nix flake update + nixos-rebuild switch
+```
+
+## Role Modules
+
+### `home-assistant`
+
+Full home automation stack:
+
+| Service | Image | Port | Data |
+|---------|-------|------|------|
+| Home Assistant | `ghcr.io/home-assistant/home-assistant:stable` | 8123 | `/srv/homeassistant` |
+| Node-RED | `nodered/node-red:latest` | 1880 | `/srv/nodered` |
+| Homebridge | `homebridge/homebridge:latest` | 8581 | `/srv/homebridge` |
+| Tailscale | `tailscale/tailscale:latest` | 41641 | `/srv/tailscale` |
+
+Also includes:
+- HACS and Node-RED Companion auto-seeded on first boot
+- Homebridge auto-patched to use ciao mDNS advertiser
+- Avahi for HomeKit/mDNS discovery
+- systemd-resolved for split DNS with Tailscale
+- ZSH with oh-my-zsh, starship, neofetch
+- OSC 52 `yank` function for copying remote output to local clipboard over SSH
+- SSH with ed25519 key auth, no passwords
+
+### `dual-tailscale`
+
+Adds a secondary Tailscale container for joining a second tailnet. Runs on `--network=host` with `--port=41642` to avoid conflicts with the primary instance.
+
+- Auth: manual via `sudo docker logs tailscale-secondary` (grab the login URL)
+- State: persisted at `/srv/tailscale-secondary`
+
+## Secrets
+
+Secrets are stored in `.env` (gitignored) and baked into the ISO at build time:
+
+```bash
+# .env
+TAILSCALE_AUTHKEY="tskey-auth-..."
+SSH_AUTHORIZED_KEYS=(
+  "ssh-ed25519 AAAA... key-name"
+)
+```
+
+The installer writes `TS_AUTHKEY=...` to `/srv/tailscale.env` for the primary Tailscale container to auto-join on first boot.
+
+## Building the ISO
 
 ```bash
 git clone https://github.com/runmedaily/runmeNix
 cd runmeNix
 
+# Create .env with your secrets (see above)
 make build-minimal
-# ISO will be in result/iso/
+# ISO: result/iso/
 ```
 
-### Write to USB
+Write to USB:
 
 ```bash
 lsblk
 sudo dd if=result/iso/*.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
-### Install
-
-Boot from USB. The installer runs automatically on tty1, or start it manually:
-
-```bash
-sudo /etc/nixos-custom/install.sh
-```
-
-The installer partitions the disk (UEFI or BIOS), sets up a user with ZSH + oh-my-zsh, SSH key auth, and installs a minimal terminal environment.
-
-## Deploying to Hosts
-
-After initial install, manage hosts remotely from your dev machine:
-
-```bash
-# Edit the host config
-vim hosts/nixos-ha-server/configuration.nix
-
-# Deploy to the machine
-NIX_SSHOPTS="-i ~/.ssh/nixos_custom_iso_ed25519" \
-  nixos-rebuild switch \
-  --flake .#nixos-ha-server \
-  --target-host hanix@<hostname> \
-  --sudo --ask-sudo-password
-```
-
-Or rebuild from the machine itself:
-
-```bash
-sudo nixos-rebuild switch --flake github:runmedaily/runmeNix#nixos-ha-server --refresh
-```
-
-## What's Included
-
-The minimal install and host configs provide:
-
-- **ZSH** with oh-my-zsh (robbyrussell theme), autosuggestions, syntax highlighting
-- **neofetch** on shell start
-- **claude** alias (`nix run github:sadjow/claude-code-nix`)
-- **SSH** with ed25519 key auth, no password, no root login
-- **Tailscale** VPN
-- **Neovim** as default editor (with vi/vim aliases)
-- **Starship** prompt
-- **Terminal tools**: tmux, git, curl, wget, htop, btop, eza, bat, ripgrep, fd, fzf, ranger
+Boot from USB. The installer runs on tty1 and prompts for disk, username, password, and role selection.
 
 ## Project Structure
 
 ```
 runmeNix/
-├── flake.nix              # Flake outputs: ISOs + host configs
-├── iso.nix                # Live ISO environment
-├── hosts/                 # Deployable machine configurations
-│   └── nixos-ha-server/
-│       ├── configuration.nix
-│       └── hardware-configuration.nix
-├── profiles/
-│   └── minimal.nix        # Live ISO profile
+├── flake.nix                  # ISO configs + exported role modules
+├── iso.nix                    # Live ISO environment
+├── .env                       # Secrets (gitignored, baked into ISO)
+├── Makefile                   # Build targets
+├── installer/
+│   └── install.sh             # TUI installer
 ├── modules/
-│   ├── common.nix         # Shared base config
-│   └── desktop/
-│       └── minimal.nix    # Terminal-focused module
-└── installer/
-    └── install.sh         # TUI installer script
+│   ├── common.nix             # Shared base config (boot, locale, users, SSH)
+│   ├── roles/
+│   │   ├── home-assistant.nix # HA + Node-RED + Homebridge + Tailscale
+│   │   └── dual-tailscale.nix # Secondary Tailscale for multi-tailnet
+│   ├── desktop/
+│   │   ├── xfce.nix           # XFCE desktop
+│   │   ├── minimal.nix        # Terminal-only
+│   │   └── hyprland.nix       # Wayland tiling
+│   └── shared/
+│       └── server-home.nix    # Home-manager config (neovim, etc.)
+└── profiles/                  # Live ISO environments
+    ├── beginner.nix
+    ├── minimal.nix
+    └── hyprland.nix
 ```
 
-## Adding a New Host
+## Remote Clipboard
 
-1. Create `hosts/<name>/` with `configuration.nix` and `hardware-configuration.nix`
-2. Add to `flake.nix`:
-
-```nix
-nixosConfigurations.<name> = nixpkgs.lib.nixosSystem {
-  inherit system;
-  modules = [ ./hosts/<name>/configuration.nix ];
-};
-```
-
-3. Deploy: `nixos-rebuild switch --flake .#<name> --target-host user@host --sudo --ask-sudo-password`
-
-## First-Time Bootstrap
-
-After a fresh install, the machine needs one manual rebuild to pick up `trusted-users` so remote deploys work:
+Servers include a `yank` shell function (OSC 52) for copying output to your local clipboard over SSH:
 
 ```bash
-# SSH into the machine
-ssh -i ~/.ssh/nixos_custom_iso_ed25519 user@<ip>
-
-# Bootstrap from the flake
-sudo nixos-rebuild switch --flake github:runmedaily/runmeNix#nixos-ha-server --refresh
+sudo docker logs tailscale-secondary 2>&1 | tail -20 | yank
+cat /etc/nixos/flake.nix | yank
 ```
 
-After this, all future deploys can be done remotely via `--target-host`.
+Works with Kitty, iTerm2, and other terminals that support OSC 52.
 
 ## License
 
