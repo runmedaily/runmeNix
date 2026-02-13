@@ -46,7 +46,7 @@
     syntaxHighlighting.enable = true;
     ohMyZsh = {
       enable = true;
-      plugins = [ "git" "sudo" "systemd" ];
+      plugins = [ "git" "sudo" "systemd" "vi-mode" ];
       theme = "robbyrussell";
     };
     interactiveShellInit = ''
@@ -61,7 +61,7 @@
     '';
     shellAliases = {
       claude = "nix run github:sadjow/claude-code-nix";
-      nrs = "sudo nix flake update --flake /etc/nixos && sudo nixos-rebuild switch --flake /etc/nixos#default";
+      nrs = "test -s /srv/tailscale.env || { echo '!! /srv/tailscale.env is empty or missing — refusing to rebuild. Fix it first.'; return 1; } && sudo nix flake update --flake /etc/nixos && sudo nixos-rebuild switch --flake /etc/nixos#default";
     };
   };
 
@@ -102,6 +102,7 @@
     "d /srv/nodered 0755 1000 1000 -"
     "d /srv/homebridge 0755 root root -"
     "d /srv/tailscale 0700 root root -"
+    "f /srv/tailscale.env 0640 root wheel -"  # must exist for --env-file; wheel-readable so scp backup works
   ];
 
   # Home Assistant Core container
@@ -159,6 +160,10 @@
       autoStart = true;
     };
   };
+
+  # Don't bounce Tailscale during nixos-rebuild — the container reconnects
+  # from persisted state in /srv/tailscale and doesn't need a fresh auth key.
+  systemd.services.docker-tailscale.restartIfChanged = false;
 
   # Seed Node-RED package.json with HA module before container starts
   systemd.services.nodered-seed-packages = {

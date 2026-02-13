@@ -35,6 +35,12 @@ TARGET_HOSTNAME=""
 USERNAME=""
 SWAP_SIZE="4" # GB
 ROLE=""
+ADDONS=()  # Optional add-on modules
+
+# Add-on definitions: "name|description|roles" (roles = comma-separated, or "all")
+AVAILABLE_ADDONS=(
+    "dual-tailscale|Secondary Tailscale for multi-tailnet access|home-assistant"
+)
 
 # ============================================================================
 # Utility Functions
@@ -238,6 +244,71 @@ select_role() {
     log_success "Role: $ROLE"
 }
 
+select_addons() {
+    # Filter add-ons for the selected role
+    local filtered=()
+    for entry in "${AVAILABLE_ADDONS[@]}"; do
+        local name="${entry%%|*}"
+        local rest="${entry#*|}"
+        local desc="${rest%%|*}"
+        local roles="${rest#*|}"
+        if [[ "$roles" == "all" ]] || [[ ",$roles," == *",$ROLE,"* ]]; then
+            filtered+=("$name|$desc")
+        fi
+    done
+
+    [[ ${#filtered[@]} -eq 0 ]] && return
+
+    echo ""
+    echo -e "${BOLD}Optional Add-ons:${NC}"
+    echo -e "  These extend the ${GREEN}$ROLE${NC} role with extra features."
+    echo ""
+
+    if command -v fzf &> /dev/null; then
+        local display=()
+        for entry in "${filtered[@]}"; do
+            local name="${entry%%|*}"
+            local desc="${entry#*|}"
+            display+=("$name  -  $desc")
+        done
+        local selected
+        selected=$(printf '%s\n' "${display[@]}" | \
+            fzf -m --prompt="Toggle with TAB, ENTER to confirm (or ESC to skip): " \
+                --height=$((${#display[@]} + 3))) || true
+        if [[ -n "$selected" ]]; then
+            while IFS= read -r line; do
+                ADDONS+=("${line%%  -*}")
+            done <<< "$selected"
+        fi
+    else
+        for i in "${!filtered[@]}"; do
+            local entry="${filtered[$i]}"
+            local name="${entry%%|*}"
+            local desc="${entry#*|}"
+            echo "  $((i+1))) $name  -  $desc"
+        done
+        echo ""
+        echo -en "${CYAN}Enter numbers to enable (comma-separated, or blank to skip): ${NC}"
+        read -r choices
+        if [[ -n "$choices" ]]; then
+            IFS=',' read -ra nums <<< "$choices"
+            for num in "${nums[@]}"; do
+                num=$(echo "$num" | tr -d ' ')
+                if [[ "$num" =~ ^[0-9]+$ ]] && (( num >= 1 && num <= ${#filtered[@]} )); then
+                    local entry="${filtered[$((num-1))]}"
+                    ADDONS+=("${entry%%|*}")
+                fi
+            done
+        fi
+    fi
+
+    if [[ ${#ADDONS[@]} -gt 0 ]]; then
+        log_success "Add-ons: ${ADDONS[*]}"
+    else
+        log_info "No add-ons selected"
+    fi
+}
+
 # ============================================================================
 # Partitioning Functions
 # ============================================================================
@@ -395,6 +466,13 @@ generate_flake() {
     # Generate hardware configuration
     nixos-generate-config --root "$MOUNT_POINT"
 
+    # Build add-on module import lines
+    local addon_lines=""
+    for addon in "${ADDONS[@]}"; do
+        addon_lines+="        runmeNix.nixosModules.$addon
+"
+    done
+
     # Generate flake.nix
     cat > "$MOUNT_POINT$CONFIG_DIR/flake.nix" << EOF
 {
@@ -418,7 +496,7 @@ generate_flake() {
         ./hardware-configuration.nix
         ./local.nix
         runmeNix.nixosModules.$ROLE
-        home-manager.nixosModules.home-manager
+$addon_lines        home-manager.nixosModules.home-manager
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
@@ -550,6 +628,7 @@ main() {
     select_keyboard
     get_user_info
     select_role
+    select_addons
 
     # Summary
     show_banner
@@ -557,6 +636,9 @@ main() {
     echo "─────────────────────────────────────"
     echo -e "  Profile:   ${GREEN}$PROFILE${NC}"
     echo -e "  Role:      ${GREEN}$ROLE${NC}"
+    if [[ ${#ADDONS[@]} -gt 0 ]]; then
+        echo -e "  Add-ons:   ${GREEN}${ADDONS[*]}${NC}"
+    fi
     echo -e "  Disk:      ${YELLOW}$DISK${NC}"
     echo -e "  Timezone:  $TIMEZONE"
     echo -e "  Keyboard:  $KEYBOARD"
@@ -594,12 +676,13 @@ main() {
     # Set user password
     set_user_password
 
-    # Join Tailscale if auth key is available
+    # Write Tailscale auth key so the Docker container auto-joins on first boot
     if [[ -n "${TAILSCALE_AUTHKEY:-}" ]]; then
-        log_info "Joining Tailscale network..."
-        nixos-enter --root "$MOUNT_POINT" -c "tailscale up --authkey=$TAILSCALE_AUTHKEY" 2>/dev/null && \
-            log_success "Tailscale joined" || \
-            log_warn "Tailscale join failed - you can run 'sudo tailscale up' after reboot"
+        mkdir -p "$MOUNT_POINT/srv"
+        echo "TS_AUTHKEY=$TAILSCALE_AUTHKEY" > "$MOUNT_POINT/srv/tailscale.env"
+        chmod 640 "$MOUNT_POINT/srv/tailscale.env"
+        chown root:wheel "$MOUNT_POINT/srv/tailscale.env" 2>/dev/null || true
+        log_success "Tailscale auth key written to /srv/tailscale.env"
     fi
 
     # Done!

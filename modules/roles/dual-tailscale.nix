@@ -10,6 +10,9 @@
     "d /srv/tailscale-secondary 0700 root root -"
   ];
 
+  # Don't bounce during nixos-rebuild — reconnects from persisted state
+  systemd.services.docker-tailscale-secondary.restartIfChanged = false;
+
   virtualisation.oci-containers.containers = {
     tailscale-secondary = {
       image = "tailscale/tailscale:latest";
