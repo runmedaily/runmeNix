@@ -19,7 +19,8 @@
       ];
       environment = {
         TS_STATE_DIR = "/var/lib/tailscale";
-        TS_EXTRA_ARGS = "--advertise-exit-node --port=41642";
+        TS_EXTRA_ARGS = "--advertise-exit-node";
+        TS_TAILSCALED_EXTRA_ARGS = "--port=41642";
         TS_ACCEPT_DNS = "true";
         TS_HOSTNAME = config.networking.hostName;
       };
