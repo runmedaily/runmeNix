@@ -143,6 +143,7 @@
         TS_EXTRA_ARGS = "--advertise-exit-node";
         TS_ACCEPT_DNS = "true";
       };
+      environmentFiles = [ "/srv/tailscale.env" ];
       extraOptions = [
         "--cap-add=NET_ADMIN"
         "--cap-add=NET_RAW"
