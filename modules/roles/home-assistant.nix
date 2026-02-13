@@ -165,6 +165,29 @@
   # from persisted state in /srv/tailscale and doesn't need a fresh auth key.
   systemd.services.docker-tailscale.restartIfChanged = false;
 
+  # Migrate native Tailscale state to Docker state dir before container starts.
+  # Without this, Docker Tailscale registers as a NEW device and the old IP dies,
+  # locking you out of SSH. Only runs once (skips if Docker state already has identity).
+  systemd.services.tailscale-migrate-state = {
+    description = "Migrate native Tailscale state to Docker container state dir";
+    wantedBy = [ "docker-tailscale.service" ];
+    before = [ "docker-tailscale.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      NATIVE="/var/lib/tailscale"
+      DOCKER="/srv/tailscale"
+      # Only migrate if native state exists and Docker state is missing or empty
+      if [ -f "$NATIVE/tailscaled.state" ] && [ ! -f "$DOCKER/tailscaled.state" -o ! -s "$DOCKER/tailscaled.state" ]; then
+        echo "Migrating native Tailscale state to Docker state dir..."
+        cp -a "$NATIVE"/* "$DOCKER"/ 2>/dev/null || true
+        echo "Migration complete"
+      fi
+    '';
+  };
+
   # Seed Node-RED package.json with HA module before container starts
   systemd.services.nodered-seed-packages = {
     description = "Seed Node-RED package.json with Home Assistant module";
