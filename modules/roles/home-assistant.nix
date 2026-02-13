@@ -51,6 +51,13 @@
     };
     interactiveShellInit = ''
       neofetch
+
+      # OSC 52 remote clipboard - pipe output to yank to copy to local clipboard over SSH
+      # Usage: echo "hello" | yank    or    cat file.log | yank
+      yank() {
+        local data=$(base64 | tr -d '\n')
+        printf "\033]52;c;%s\a" "$data"
+      }
     '';
     shellAliases = {
       claude = "nix run github:sadjow/claude-code-nix";
