@@ -145,6 +145,7 @@
       volumes = [
         "/srv/tailscale:/var/lib/tailscale"
         "/dev/net/tun:/dev/net/tun"
+        "/dev/tpmrm0:/dev/tpmrm0"
       ];
       environment = {
         TS_STATE_DIR = "/var/lib/tailscale";
