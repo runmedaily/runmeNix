@@ -61,7 +61,7 @@
     '';
     shellAliases = {
       claude = "nix run github:sadjow/claude-code-nix";
-      nrs = "test -s /srv/tailscale.env || { echo '!! /srv/tailscale.env is empty or missing — refusing to rebuild. Fix it first.'; return 1; } && sudo nix flake update --flake /etc/nixos && sudo nixos-rebuild switch --flake /etc/nixos#default";
+      nrs = "test -s /srv/tailscale.env || { echo '!! /srv/tailscale.env is empty or missing — refusing to rebuild. Fix it first.'; return 1; } && echo 'Pre-pulling container images...' && sudo docker pull tailscale/tailscale:latest && sudo docker pull ghcr.io/home-assistant/home-assistant:stable && sudo docker pull nodered/node-red:latest && sudo docker pull homebridge/homebridge:latest && sudo nix flake update --flake /etc/nixos && sudo nixos-rebuild switch --flake /etc/nixos#default";
     };
   };
 
@@ -101,7 +101,7 @@
     "d /srv/homeassistant 0755 root root -"
     "d /srv/nodered 0755 1000 1000 -"
     "d /srv/homebridge 0755 root root -"
-    "d /srv/tailscale 0700 root root -"
+    "d /srv/tailscale 0755 root root -"
     "f /srv/tailscale.env 0640 root wheel -"  # must exist for --env-file; wheel-readable so scp backup works
   ];
 
@@ -176,15 +176,28 @@
       Type = "oneshot";
       RemainAfterExit = true;
     };
+    path = [ pkgs.docker pkgs.coreutils ];
     script = ''
       NATIVE="/var/lib/tailscale"
       DOCKER="/srv/tailscale"
+
+      # Pre-pull the Tailscale image so the container can start immediately
+      if ! docker image inspect tailscale/tailscale:latest >/dev/null 2>&1; then
+        echo "Pre-pulling tailscale/tailscale:latest..."
+        docker pull tailscale/tailscale:latest
+      fi
+
       # Only migrate if native state exists and Docker state is missing or empty
       if [ -f "$NATIVE/tailscaled.state" ] && [ ! -f "$DOCKER/tailscaled.state" -o ! -s "$DOCKER/tailscaled.state" ]; then
         echo "Migrating native Tailscale state to Docker state dir..."
         cp -a "$NATIVE"/* "$DOCKER"/ 2>/dev/null || true
+        chmod -R 755 "$DOCKER"
+        chown -R root:root "$DOCKER"
         echo "Migration complete"
       fi
+
+      # Always ensure correct permissions
+      chmod 755 "$DOCKER"
     '';
   };
 
