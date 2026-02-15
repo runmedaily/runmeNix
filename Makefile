@@ -25,21 +25,39 @@ endif
 # Build targets
 build-beginner:
 	@echo "Building beginner (XFCE) ISO..."
-	nix build .#nixosConfigurations.iso-beginner.config.system.build.isoImage
-	@echo "✓ Beginner ISO built successfully!"
-	@echo "  Location: result/iso/"
+	@if [ -f .env ]; then git add -f .env; fi
+	@nix build .#nixosConfigurations.iso-beginner.config.system.build.isoImage; \
+		status=$$?; \
+		git reset .env 2>/dev/null; \
+		if [ $$status -eq 0 ]; then \
+			echo "✓ Beginner ISO built successfully!"; \
+			echo "  Location: result/iso/"; \
+		fi; \
+		exit $$status
 
 build-minimal:
 	@echo "Building minimal (terminal-only) ISO..."
-	nix build .#nixosConfigurations.iso-minimal.config.system.build.isoImage
-	@echo "✓ Minimal ISO built successfully!"
-	@echo "  Location: result/iso/"
+	@if [ -f .env ]; then git add -f .env; fi
+	@nix build .#nixosConfigurations.iso-minimal.config.system.build.isoImage; \
+		status=$$?; \
+		git reset .env 2>/dev/null; \
+		if [ $$status -eq 0 ]; then \
+			echo "✓ Minimal ISO built successfully!"; \
+			echo "  Location: result/iso/"; \
+		fi; \
+		exit $$status
 
 build-hyprland:
 	@echo "Building Hyprland (Wayland) ISO..."
-	nix build .#nixosConfigurations.iso-hyprland.config.system.build.isoImage
-	@echo "✓ Hyprland ISO built successfully!"
-	@echo "  Location: result/iso/"
+	@if [ -f .env ]; then git add -f .env; fi
+	@nix build .#nixosConfigurations.iso-hyprland.config.system.build.isoImage; \
+		status=$$?; \
+		git reset .env 2>/dev/null; \
+		if [ $$status -eq 0 ]; then \
+			echo "✓ Hyprland ISO built successfully!"; \
+			echo "  Location: result/iso/"; \
+		fi; \
+		exit $$status
 
 build-all: build-beginner build-minimal build-hyprland
 	@echo "✓ All ISOs built successfully!"
