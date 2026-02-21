@@ -216,29 +216,32 @@
     '';
   };
 
-  # Seed Node-RED package.json with HA module before container starts
-  systemd.services.nodered-seed-packages = {
-    description = "Seed Node-RED package.json with Home Assistant module";
+  # Install Home Assistant nodes into Node-RED after container starts
+  systemd.services.nodered-install-ha = {
+    description = "Install Home Assistant nodes in Node-RED";
     wantedBy = [ "docker-nodered.service" ];
-    before = [ "docker-nodered.service" ];
+    after = [ "docker-nodered.service" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
     };
+    path = [ pkgs.docker ];
     script = ''
-      PKGJSON="/srv/nodered/package.json"
-      if [ ! -f "$PKGJSON" ]; then
-        cat > "$PKGJSON" << 'SEED'
-      {
-        "name": "nodered-project",
-        "description": "Node-RED with Home Assistant",
-        "version": "0.0.1",
-        "dependencies": {
-          "node-red-contrib-home-assistant-websocket": "*"
-        }
-      }
-      SEED
-        chown 1000:1000 "$PKGJSON"
+      # Wait for Node-RED container to be ready
+      for i in $(seq 1 30); do
+        if docker exec nodered true 2>/dev/null; then break; fi
+        sleep 2
+      done
+
+      # Install if not already present
+      if [ ! -d "/srv/nodered/node_modules/node-red-contrib-home-assistant-websocket" ]; then
+        echo "Installing node-red-contrib-home-assistant-websocket..."
+        docker exec -w /data nodered npm install node-red-contrib-home-assistant-websocket 2>&1
+        echo "Restarting Node-RED to load new nodes..."
+        docker restart nodered
+        echo "Done"
+      else
+        echo "Home Assistant nodes already installed"
       fi
     '';
   };
