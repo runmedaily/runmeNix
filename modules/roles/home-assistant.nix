@@ -81,7 +81,7 @@
 
   # Terminal packages
   environment.systemPackages = with pkgs; [
-    tmux git curl wget htop btop neofetch
+    tmux git curl wget htop btop neofetch unzip
     eza bat ripgrep fd fzf ranger starship
     cowsay
     kitty.terminfo
@@ -234,6 +234,8 @@
     description = "Install HACS and Node-RED Companion into Home Assistant";
     wantedBy = [ "docker-homeassistant.service" ];
     before = [ "docker-homeassistant.service" ];
+    after = [ "network-online.target" ];
+    requires = [ "network-online.target" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
