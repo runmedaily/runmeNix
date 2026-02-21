@@ -162,6 +162,20 @@
     };
   };
 
+  # All containers need network for image pulls and npm install
+  systemd.services.docker-homeassistant = {
+    after = [ "network-online.target" ];
+    requires = [ "network-online.target" ];
+  };
+  systemd.services.docker-nodered = {
+    after = [ "network-online.target" ];
+    requires = [ "network-online.target" ];
+  };
+  systemd.services.docker-homebridge = {
+    after = [ "network-online.target" ];
+    requires = [ "network-online.target" ];
+  };
+
   # Don't bounce Tailscale during nixos-rebuild — the container reconnects
   # from persisted state in /srv/tailscale and doesn't need a fresh auth key.
   systemd.services.docker-tailscale.restartIfChanged = false;
